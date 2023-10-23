@@ -229,3 +229,12 @@ func copyRPC(rpc *RPC) *RPC {
 	}
 	return res
 }
+
+// Export rpcWithControl (combines control messages into a RPC)
+func RPCWithControl(msgs []*pb.Message,
+	ihave []*pb.ControlIHave,
+	iwant []*pb.ControlIWant,
+	graft []*pb.ControlGraft,
+	prune []*pb.ControlPrune) *RPC {
+	return rpcWithControl(msgs, ihave, iwant, graft, prune)
+}

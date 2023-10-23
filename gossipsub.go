@@ -28,6 +28,8 @@ const (
 	GossipSubID_v11 = protocol.ID("/meshsub/1.1.0")
 )
 
+type HeartbeatProxyFn func()
+
 // Defines the default gossipsub parameters.
 var (
 	GossipSubD                                = 6
@@ -474,6 +476,9 @@ type GossipSubRouter struct {
 	// number of heartbeats since the beginning of time; this allows us to amortize some resource
 	// clean up -- eg backoff clean up.
 	heartbeatTicks uint64
+
+	// Proxy function for heartbeat
+	heartbeatProxy HeartbeatProxyFn
 }
 
 type connectInfo struct {
@@ -1353,6 +1358,10 @@ func (gs *GossipSubRouter) heartbeat() {
 		}
 	}()
 
+	if gs.heartbeatProxy != nil {
+		gs.heartbeatProxy()
+	}
+
 	gs.heartbeatTicks++
 
 	tograft := make(map[peer.ID][]string)
@@ -1960,4 +1969,76 @@ func shuffleStrings(lst []string) {
 		j := rand.Intn(i + 1)
 		lst[i], lst[j] = lst[j], lst[i]
 	}
+}
+
+// Create as many IWANT messages as possible for a given topic
+func (gs *GossipSubRouter) CreateIWANTsForTopic(topic string) []*pb.ControlIWant {
+
+	// Get list of message IDs from topic
+	messageIDs := gs.mcache.GetGossipIDs(topic)
+
+	// initialize list of control messages to be returns
+	iwants := make([]*pb.ControlIWant, len(messageIDs))
+
+	// Fill the list of ControlIWANTs, each with a single message ID
+	for index, messageID := range messageIDs {
+		controlWithSingleIWANT := pb.ControlIWant{MessageIDs: []string{messageID}}
+		iwants[index] = &controlWithSingleIWANT
+	}
+
+	return iwants
+}
+
+// Create as many IWANT messages as possible for a peer (for all topics it belongs)
+func (gs *GossipSubRouter) CreateIWANTsForPeer(peerID peer.ID) []*pb.ControlIWant {
+
+	// Init return list
+	var allControlIWANTs []*pb.ControlIWant
+
+	// For each topic that peerID belongs to, get all possible IWANTs and append
+	for topic, peers := range gs.p.topics {
+		_, peer_in_topic := peers[peerID]
+		if peer_in_topic {
+			controlIWANTSForTopic := gs.CreateIWANTsForTopic(topic)
+			allControlIWANTs = append(allControlIWANTs, controlIWANTSForTopic...)
+		}
+	}
+
+	return allControlIWANTs
+}
+
+// Create shuffled IHAVE message for a topic
+func (gs *GossipSubRouter) CreateIHAVE(topic string) *pb.ControlIHave {
+
+	// Get message IDs from topic
+	messageIDs := gs.mcache.GetGossipIDs(topic)
+
+	// Shuffle to emit in random order
+	shuffleStrings(messageIDs)
+
+	// Truncate IHAVE length if it's superior to  maximum
+	restrictedMessageIDs := messageIDs
+	if len(messageIDs) > gs.params.MaxIHaveLength {
+		restrictedMessageIDs = make([]string, gs.params.MaxIHaveLength)
+		copy(restrictedMessageIDs, messageIDs)
+	}
+
+	controlIHAVE := pb.ControlIHave{TopicID: &topic, MessageIDs: restrictedMessageIDs}
+
+	return &controlIHAVE
+}
+
+// Export flush (sends pening gossips)
+func (gs *GossipSubRouter) Flush() {
+	gs.flush()
+}
+
+// Export SendRPC
+func (gs *GossipSubRouter) SendRPC(peerID peer.ID, out *RPC) {
+	gs.sendRPC(peerID, out)
+}
+
+// Set heartbeat proxy
+func (gs *GossipSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
+	gs.heartbeatProxy = heartbeatProxy
 }
