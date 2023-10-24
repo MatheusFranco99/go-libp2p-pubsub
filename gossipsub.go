@@ -2007,8 +2007,23 @@ func (gs *GossipSubRouter) CreateIWANTsForPeer(peerID peer.ID) []*pb.ControlIWan
 	return allControlIWANTs
 }
 
+// Create as many IWANT messages as possible for all topics
+func (gs *GossipSubRouter) CreateIWANTs() []*pb.ControlIWant {
+
+	// Init return list
+	var allControlIWANTs []*pb.ControlIWant
+
+	// For each topic that peerID belongs to, get all possible IWANTs and append
+	for topic, _ := range gs.p.topics {
+		controlIWANTSForTopic := gs.CreateIWANTsForTopic(topic)
+		allControlIWANTs = append(allControlIWANTs, controlIWANTSForTopic...)
+	}
+
+	return allControlIWANTs
+}
+
 // Create shuffled IHAVE message for a topic
-func (gs *GossipSubRouter) CreateIHAVE(topic string) *pb.ControlIHave {
+func (gs *GossipSubRouter) CreateIHAVEForTopic(topic string) *pb.ControlIHave {
 
 	// Get message IDs from topic
 	messageIDs := gs.mcache.GetGossipIDs(topic)
@@ -2028,6 +2043,21 @@ func (gs *GossipSubRouter) CreateIHAVE(topic string) *pb.ControlIHave {
 	return &controlIHAVE
 }
 
+// Create IHAVE for all topics
+func (gs *GossipSubRouter) CreateIHAVEs() []*pb.ControlIHave {
+
+	// Init return list
+	var allIHAVEs []*pb.ControlIHave
+
+	// For each topic, get the associated IHAVE and append
+	for topic, _ := range gs.p.topics {
+		controlIHAVEsForTopic := gs.CreateIHAVEForTopic(topic)
+		allIHAVEs = append(allIHAVEs, controlIHAVEsForTopic)
+	}
+
+	return allIHAVEs
+}
+
 // Export flush (sends pening gossips)
 func (gs *GossipSubRouter) Flush() {
 	gs.flush()
@@ -2038,7 +2068,37 @@ func (gs *GossipSubRouter) SendRPC(peerID peer.ID, out *RPC) {
 	gs.sendRPC(peerID, out)
 }
 
+// Send RPC to all known peers
+func (gs *GossipSubRouter) BroadcastRPC(out *RPC) {
+	peers := gs.GetAllPeers()
+	for _, peerID := range peers {
+		gs.sendRPC(peerID, out)
+	}
+}
+
 // Set heartbeat proxy
 func (gs *GossipSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
 	gs.heartbeatProxy = heartbeatProxy
+}
+
+// Get all peers
+func (gs *GossipSubRouter) GetAllPeers() []peer.ID {
+	// Init peer map to store unique peers
+	peerMap := make(map[peer.ID]struct{})
+
+	// For every peer in every topic, add it to the map
+	for _, peersInTopic := range gs.p.topics {
+		for p := range peersInTopic {
+			// add the peer to the map
+			peerMap[p] = struct{}{}
+		}
+	}
+
+	// Convert the map keys back to a slice
+	peers := make([]peer.ID, 0, len(peerMap))
+	for p := range peerMap {
+		peers = append(peers, p)
+	}
+
+	return peers
 }

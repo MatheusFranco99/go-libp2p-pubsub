@@ -212,6 +212,18 @@ type PubSubRouter interface {
 	// Leave notifies the router that we are no longer interested in a topic.
 	// It is invoked after the unsubscription announcement.
 	Leave(topic string)
+
+	// GossipSub related exported functions for simulator
+	CreateIWANTsForTopic(topic string) []*pb.ControlIWant
+	CreateIWANTsForPeer(peerID peer.ID) []*pb.ControlIWant
+	CreateIWANTs() []*pb.ControlIWant
+	CreateIHAVEForTopic(topic string) *pb.ControlIHave
+	CreateIHAVEs() []*pb.ControlIHave
+	Flush()
+	SendRPC(peerID peer.ID, out *RPC)
+	BroadcastRPC(out *RPC)
+	WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)
+	GetAllPeers() []peer.ID
 }
 
 type AcceptStatus int
@@ -1419,4 +1431,9 @@ type RelayCancelFunc func()
 type addRelayReq struct {
 	topic string
 	resp  chan RelayCancelFunc
+}
+
+// Expose router
+func (p *PubSub) GetRouter() PubSubRouter {
+	return p.rt
 }
