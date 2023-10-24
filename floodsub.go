@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -105,4 +106,36 @@ func (fs *FloodSubRouter) Join(topic string) {
 
 func (fs *FloodSubRouter) Leave(topic string) {
 	fs.tracer.Leave(topic)
+}
+
+// Mock methods to follow interface definition
+func (fs *FloodSubRouter) CreateIWANTsForTopic(topic string) []*pb.ControlIWant {
+	return []*pb.ControlIWant{}
+}
+func (fs *FloodSubRouter) CreateIWANTsForPeer(peerID peer.ID) []*pb.ControlIWant {
+	return []*pb.ControlIWant{}
+}
+func (fs *FloodSubRouter) CreateIWANTs() []*pb.ControlIWant {
+	return []*pb.ControlIWant{}
+}
+func (fs *FloodSubRouter) CreateIHAVEForTopic(topic string) *pb.ControlIHave {
+	return &pb.ControlIHave{}
+}
+func (fs *FloodSubRouter) CreateIHAVEs() []*pb.ControlIHave {
+	return []*pb.ControlIHave{}
+}
+func (fs *FloodSubRouter) Flush() {
+	return
+}
+func (fs *FloodSubRouter) SendRPC(peerID peer.ID, out *RPC) {
+	return
+}
+func (fs *FloodSubRouter) BroadcastRPC(out *RPC) {
+	return
+}
+func (fs *FloodSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
+	return
+}
+func (fs *FloodSubRouter) GetAllPeers() []peer.ID {
+	return []peer.ID{}
 }

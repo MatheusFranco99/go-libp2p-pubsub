@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -165,4 +166,36 @@ func (rs *RandomSubRouter) Join(topic string) {
 
 func (rs *RandomSubRouter) Leave(topic string) {
 	rs.tracer.Join(topic)
+}
+
+// Mock methods to follow interface definition
+func (rs *RandomSubRouter) CreateIWANTsForTopic(topic string) []*pb.ControlIWant {
+	return []*pb.ControlIWant{}
+}
+func (rs *RandomSubRouter) CreateIWANTsForPeer(peerID peer.ID) []*pb.ControlIWant {
+	return []*pb.ControlIWant{}
+}
+func (rs *RandomSubRouter) CreateIWANTs() []*pb.ControlIWant {
+	return []*pb.ControlIWant{}
+}
+func (rs *RandomSubRouter) CreateIHAVEForTopic(topic string) *pb.ControlIHave {
+	return &pb.ControlIHave{}
+}
+func (rs *RandomSubRouter) CreateIHAVEs() []*pb.ControlIHave {
+	return []*pb.ControlIHave{}
+}
+func (rs *RandomSubRouter) Flush() {
+	return
+}
+func (rs *RandomSubRouter) SendRPC(peerID peer.ID, out *RPC) {
+	return
+}
+func (rs *RandomSubRouter) BroadcastRPC(out *RPC) {
+	return
+}
+func (rs *RandomSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
+	return
+}
+func (rs *RandomSubRouter) GetAllPeers() []peer.ID {
+	return []peer.ID{}
 }
