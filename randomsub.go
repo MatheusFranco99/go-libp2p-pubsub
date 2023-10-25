@@ -172,6 +172,7 @@ func (rs *RandomSubRouter) Leave(topic string) {
 // Mock methods due to the GossipSub exported functions for the simulator
 func (rs *RandomSubRouter) GetTopics() map[string]map[peer.ID]struct{}   { return nil }
 func (rs *RandomSubRouter) GetMessageIDsForTopic(topic string) []string  { return nil }
+func (rs *RandomSubRouter) GetMesh() map[string]map[peer.ID]struct{}     { return nil }
 func (rs *RandomSubRouter) GetBackoff() map[string]map[peer.ID]time.Time { return nil }
 func (rs *RandomSubRouter) CreateIHAVEInGossipSubWay(topic string, messageIDs []string) *pb.ControlIHave {
 	return nil
@@ -188,4 +189,5 @@ func (rs *RandomSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, 
 func (rs *RandomSubRouter) SendRPC(peerID peer.ID, out *RPC)                   {}
 func (rs *RandomSubRouter) Flush()                                             {}
 func (rs *RandomSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {}
+func (rs *RandomSubRouter) GetGossipSubParams() *GossipSubParams               { return nil }
 func (rs *RandomSubRouter) GetRouterMetrics() *RouterMetrics                   { return nil }

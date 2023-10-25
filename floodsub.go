@@ -112,6 +112,7 @@ func (fs *FloodSubRouter) Leave(topic string) {
 // Mock methods due to the GossipSub exported functions for the simulator
 func (fs *FloodSubRouter) GetTopics() map[string]map[peer.ID]struct{}   { return nil }
 func (fs *FloodSubRouter) GetMessageIDsForTopic(topic string) []string  { return nil }
+func (fs *FloodSubRouter) GetMesh() map[string]map[peer.ID]struct{}     { return nil }
 func (fs *FloodSubRouter) GetBackoff() map[string]map[peer.ID]time.Time { return nil }
 func (fs *FloodSubRouter) CreateIHAVEInGossipSubWay(topic string, messageIDs []string) *pb.ControlIHave {
 	return nil
@@ -128,4 +129,5 @@ func (fs *FloodSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, b
 func (fs *FloodSubRouter) SendRPC(peerID peer.ID, out *RPC)                   {}
 func (fs *FloodSubRouter) Flush()                                             {}
 func (fs *FloodSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {}
+func (fs *FloodSubRouter) GetGossipSubParams() *GossipSubParams               { return nil }
 func (fs *FloodSubRouter) GetRouterMetrics() *RouterMetrics                   { return nil }

@@ -2014,6 +2014,11 @@ func (gs *GossipSubRouter) GetMessageIDsForTopic(topic string) []string {
 	return gs.mcache.GetGossipIDs(topic)
 }
 
+// Export mesh map
+func (gs *GossipSubRouter) GetMesh() map[string]map[peer.ID]struct{} {
+	return gs.mesh
+}
+
 // Export the backoff map
 func (gs *GossipSubRouter) GetBackoff() map[string]map[peer.ID]time.Time {
 	return gs.backoff
@@ -2080,4 +2085,9 @@ func (gs *GossipSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
 // Export router metrics
 func (gs *GossipSubRouter) GetRouterMetrics() *RouterMetrics {
 	return gs.RouterMetrics
+}
+
+// Export router metrics
+func (gs *GossipSubRouter) GetGossipSubParams() *GossipSubParams {
+	return &gs.params
 }

@@ -216,6 +216,7 @@ type PubSubRouter interface {
 	// Functions to export GossipSub functionality for the simulator
 	GetTopics() map[string]map[peer.ID]struct{}
 	GetMessageIDsForTopic(topic string) []string
+	GetMesh() map[string]map[peer.ID]struct{}
 	GetBackoff() map[string]map[peer.ID]time.Time
 	CreateIHAVEInGossipSubWay(topic string, messageIDs []string) *pb.ControlIHave
 	CreateCustomIHAVE(topic string, messageIDs []string) *pb.ControlIHave
@@ -226,6 +227,7 @@ type PubSubRouter interface {
 	SendRPC(peerID peer.ID, out *RPC)
 	Flush()
 	WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)
+	GetGossipSubParams() *GossipSubParams
 
 	// Export metrics
 	GetRouterMetrics() *RouterMetrics
