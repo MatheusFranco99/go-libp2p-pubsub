@@ -213,17 +213,19 @@ type PubSubRouter interface {
 	// It is invoked after the unsubscription announcement.
 	Leave(topic string)
 
-	// GossipSub related exported functions for simulator
-	CreateIWANTsForTopic(topic string) []*pb.ControlIWant
-	CreateIWANTsForPeer(peerID peer.ID) []*pb.ControlIWant
-	CreateIWANTs() []*pb.ControlIWant
-	CreateIHAVEForTopic(topic string) *pb.ControlIHave
-	CreateIHAVEs() []*pb.ControlIHave
-	Flush()
+	// Functions to export GossipSub functionality for the simulator
+	GetTopics() map[string]map[peer.ID]struct{}
+	GetMessageIDsForTopic(topic string) []string
+	GetBackoff() map[string]map[peer.ID]time.Time
+	CreateIHAVEInGossipSubWay(topic string, messageIDs []string) *pb.ControlIHave
+	CreateCustomIHAVE(topic string, messageIDs []string) *pb.ControlIHave
+	CreateIWANT(messageIDs []string) *pb.ControlIWant
+	CreateGRAFT(topic string) *pb.ControlGraft
+	CreatePRUNE(topic string) *pb.ControlPrune
+	CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, backoff uint64) *pb.ControlPrune
 	SendRPC(peerID peer.ID, out *RPC)
-	BroadcastRPC(out *RPC)
+	Flush()
 	WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)
-	GetAllPeers() []peer.ID
 }
 
 type AcceptStatus int

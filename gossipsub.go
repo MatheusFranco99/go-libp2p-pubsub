@@ -1971,62 +1971,24 @@ func shuffleStrings(lst []string) {
 	}
 }
 
-// Create as many IWANT messages as possible for a given topic
-func (gs *GossipSubRouter) CreateIWANTsForTopic(topic string) []*pb.ControlIWant {
-
-	// Get list of message IDs from topic
-	messageIDs := gs.mcache.GetGossipIDs(topic)
-
-	// initialize list of control messages to be returns
-	iwants := make([]*pb.ControlIWant, len(messageIDs))
-
-	// Fill the list of ControlIWANTs, each with a single message ID
-	for index, messageID := range messageIDs {
-		controlWithSingleIWANT := pb.ControlIWant{MessageIDs: []string{messageID}}
-		iwants[index] = &controlWithSingleIWANT
-	}
-
-	return iwants
+// Export the topics map
+func (gs *GossipSubRouter) GetTopics() map[string]map[peer.ID]struct{} {
+	return gs.p.topics
 }
 
-// Create as many IWANT messages as possible for a peer (for all topics it belongs)
-func (gs *GossipSubRouter) CreateIWANTsForPeer(peerID peer.ID) []*pb.ControlIWant {
-
-	// Init return list
-	var allControlIWANTs []*pb.ControlIWant
-
-	// For each topic that peerID belongs to, get all possible IWANTs and append
-	for topic, peers := range gs.p.topics {
-		_, peer_in_topic := peers[peerID]
-		if peer_in_topic {
-			controlIWANTSForTopic := gs.CreateIWANTsForTopic(topic)
-			allControlIWANTs = append(allControlIWANTs, controlIWANTSForTopic...)
-		}
-	}
-
-	return allControlIWANTs
+// Export message IDs in mcache for a given topic
+func (gs *GossipSubRouter) GetMessageIDsForTopic(topic string) []string {
+	return gs.mcache.GetGossipIDs(topic)
 }
 
-// Create as many IWANT messages as possible for all topics
-func (gs *GossipSubRouter) CreateIWANTs() []*pb.ControlIWant {
-
-	// Init return list
-	var allControlIWANTs []*pb.ControlIWant
-
-	// For each topic that peerID belongs to, get all possible IWANTs and append
-	for topic, _ := range gs.p.topics {
-		controlIWANTSForTopic := gs.CreateIWANTsForTopic(topic)
-		allControlIWANTs = append(allControlIWANTs, controlIWANTSForTopic...)
-	}
-
-	return allControlIWANTs
+// Export the backoff map
+func (gs *GossipSubRouter) GetBackoff() map[string]map[peer.ID]time.Time {
+	return gs.backoff
 }
 
-// Create shuffled IHAVE message for a topic
-func (gs *GossipSubRouter) CreateIHAVEForTopic(topic string) *pb.ControlIHave {
-
-	// Get message IDs from topic
-	messageIDs := gs.mcache.GetGossipIDs(topic)
+// Creates an IHAVE message for a given topic and message IDs list.
+// Before doing it, it shuffles the messageIDs and truncate to the maximum length allowed
+func (gs *GossipSubRouter) CreateIHAVEInGossipSubWay(topic string, messageIDs []string) *pb.ControlIHave {
 
 	// Shuffle to emit in random order
 	shuffleStrings(messageIDs)
@@ -2043,24 +2005,28 @@ func (gs *GossipSubRouter) CreateIHAVEForTopic(topic string) *pb.ControlIHave {
 	return &controlIHAVE
 }
 
-// Create IHAVE for all topics
-func (gs *GossipSubRouter) CreateIHAVEs() []*pb.ControlIHave {
-
-	// Init return list
-	var allIHAVEs []*pb.ControlIHave
-
-	// For each topic, get the associated IHAVE and append
-	for topic, _ := range gs.p.topics {
-		controlIHAVEsForTopic := gs.CreateIHAVEForTopic(topic)
-		allIHAVEs = append(allIHAVEs, controlIHAVEsForTopic)
-	}
-
-	return allIHAVEs
+// Creates an IHAVE message for a given topic and message ID list.
+func (gs *GossipSubRouter) CreateCustomIHAVE(topic string, messageIDs []string) *pb.ControlIHave {
+	return &pb.ControlIHave{TopicID: &topic, MessageIDs: messageIDs}
 }
 
-// Export flush (sends pening gossips)
-func (gs *GossipSubRouter) Flush() {
-	gs.flush()
+func (gs *GossipSubRouter) CreateIWANT(messageIDs []string) *pb.ControlIWant {
+	return &pb.ControlIWant{MessageIDs: messageIDs}
+}
+
+// Create a GRAFT message for a topic
+func (gs *GossipSubRouter) CreateGRAFT(topic string) *pb.ControlGraft {
+	return &pb.ControlGraft{TopicID: &topic}
+}
+
+// Create a standard PRUNE message for a topic
+func (gs *GossipSubRouter) CreatePRUNE(topic string) *pb.ControlPrune {
+	return &pb.ControlPrune{TopicID: &topic}
+}
+
+// Create a PRUNE message with detailed fields such as peer suggestion and backoff time
+func (gs *GossipSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, backoff uint64) *pb.ControlPrune {
+	return &pb.ControlPrune{TopicID: &topic, Peers: px, Backoff: &backoff}
 }
 
 // Export SendRPC
@@ -2068,37 +2034,12 @@ func (gs *GossipSubRouter) SendRPC(peerID peer.ID, out *RPC) {
 	gs.sendRPC(peerID, out)
 }
 
-// Send RPC to all known peers
-func (gs *GossipSubRouter) BroadcastRPC(out *RPC) {
-	peers := gs.GetAllPeers()
-	for _, peerID := range peers {
-		gs.sendRPC(peerID, out)
-	}
+// Export flush (sends pending gossips)
+func (gs *GossipSubRouter) Flush() {
+	gs.flush()
 }
 
 // Set heartbeat proxy
 func (gs *GossipSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
 	gs.heartbeatProxy = heartbeatProxy
-}
-
-// Get all peers
-func (gs *GossipSubRouter) GetAllPeers() []peer.ID {
-	// Init peer map to store unique peers
-	peerMap := make(map[peer.ID]struct{})
-
-	// For every peer in every topic, add it to the map
-	for _, peersInTopic := range gs.p.topics {
-		for p := range peersInTopic {
-			// add the peer to the map
-			peerMap[p] = struct{}{}
-		}
-	}
-
-	// Convert the map keys back to a slice
-	peers := make([]peer.ID, 0, len(peerMap))
-	for p := range peerMap {
-		peers = append(peers, p)
-	}
-
-	return peers
 }

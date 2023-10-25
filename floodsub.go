@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"time"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -108,34 +109,22 @@ func (fs *FloodSubRouter) Leave(topic string) {
 	fs.tracer.Leave(topic)
 }
 
-// Mock methods to follow interface definition
-func (fs *FloodSubRouter) CreateIWANTsForTopic(topic string) []*pb.ControlIWant {
-	return []*pb.ControlIWant{}
+// Mock methods due to the GossipSub exported functions for the simulator
+func (fs *FloodSubRouter) GetTopics() map[string]map[peer.ID]struct{}   { return nil }
+func (fs *FloodSubRouter) GetMessageIDsForTopic(topic string) []string  { return nil }
+func (fs *FloodSubRouter) GetBackoff() map[string]map[peer.ID]time.Time { return nil }
+func (fs *FloodSubRouter) CreateIHAVEInGossipSubWay(topic string, messageIDs []string) *pb.ControlIHave {
+	return nil
 }
-func (fs *FloodSubRouter) CreateIWANTsForPeer(peerID peer.ID) []*pb.ControlIWant {
-	return []*pb.ControlIWant{}
+func (fs *FloodSubRouter) CreateCustomIHAVE(topic string, messageIDs []string) *pb.ControlIHave {
+	return nil
 }
-func (fs *FloodSubRouter) CreateIWANTs() []*pb.ControlIWant {
-	return []*pb.ControlIWant{}
+func (fs *FloodSubRouter) CreateIWANT(messageIDs []string) *pb.ControlIWant { return nil }
+func (fs *FloodSubRouter) CreateGRAFT(topic string) *pb.ControlGraft        { return nil }
+func (fs *FloodSubRouter) CreatePRUNE(topic string) *pb.ControlPrune        { return nil }
+func (fs *FloodSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, backoff uint64) *pb.ControlPrune {
+	return nil
 }
-func (fs *FloodSubRouter) CreateIHAVEForTopic(topic string) *pb.ControlIHave {
-	return &pb.ControlIHave{}
-}
-func (fs *FloodSubRouter) CreateIHAVEs() []*pb.ControlIHave {
-	return []*pb.ControlIHave{}
-}
-func (fs *FloodSubRouter) Flush() {
-	return
-}
-func (fs *FloodSubRouter) SendRPC(peerID peer.ID, out *RPC) {
-	return
-}
-func (fs *FloodSubRouter) BroadcastRPC(out *RPC) {
-	return
-}
-func (fs *FloodSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
-	return
-}
-func (fs *FloodSubRouter) GetAllPeers() []peer.ID {
-	return []peer.ID{}
-}
+func (fs *FloodSubRouter) SendRPC(peerID peer.ID, out *RPC)                   {}
+func (fs *FloodSubRouter) Flush()                                             {}
+func (fs *FloodSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {}

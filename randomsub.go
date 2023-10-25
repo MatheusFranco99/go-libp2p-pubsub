@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"math"
+	"time"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/host"
@@ -168,34 +169,22 @@ func (rs *RandomSubRouter) Leave(topic string) {
 	rs.tracer.Join(topic)
 }
 
-// Mock methods to follow interface definition
-func (rs *RandomSubRouter) CreateIWANTsForTopic(topic string) []*pb.ControlIWant {
-	return []*pb.ControlIWant{}
+// Mock methods due to the GossipSub exported functions for the simulator
+func (rs *RandomSubRouter) GetTopics() map[string]map[peer.ID]struct{}   { return nil }
+func (rs *RandomSubRouter) GetMessageIDsForTopic(topic string) []string  { return nil }
+func (rs *RandomSubRouter) GetBackoff() map[string]map[peer.ID]time.Time { return nil }
+func (rs *RandomSubRouter) CreateIHAVEInGossipSubWay(topic string, messageIDs []string) *pb.ControlIHave {
+	return nil
 }
-func (rs *RandomSubRouter) CreateIWANTsForPeer(peerID peer.ID) []*pb.ControlIWant {
-	return []*pb.ControlIWant{}
+func (rs *RandomSubRouter) CreateCustomIHAVE(topic string, messageIDs []string) *pb.ControlIHave {
+	return nil
 }
-func (rs *RandomSubRouter) CreateIWANTs() []*pb.ControlIWant {
-	return []*pb.ControlIWant{}
+func (rs *RandomSubRouter) CreateIWANT(messageIDs []string) *pb.ControlIWant { return nil }
+func (rs *RandomSubRouter) CreateGRAFT(topic string) *pb.ControlGraft        { return nil }
+func (rs *RandomSubRouter) CreatePRUNE(topic string) *pb.ControlPrune        { return nil }
+func (rs *RandomSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, backoff uint64) *pb.ControlPrune {
+	return nil
 }
-func (rs *RandomSubRouter) CreateIHAVEForTopic(topic string) *pb.ControlIHave {
-	return &pb.ControlIHave{}
-}
-func (rs *RandomSubRouter) CreateIHAVEs() []*pb.ControlIHave {
-	return []*pb.ControlIHave{}
-}
-func (rs *RandomSubRouter) Flush() {
-	return
-}
-func (rs *RandomSubRouter) SendRPC(peerID peer.ID, out *RPC) {
-	return
-}
-func (rs *RandomSubRouter) BroadcastRPC(out *RPC) {
-	return
-}
-func (rs *RandomSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
-	return
-}
-func (rs *RandomSubRouter) GetAllPeers() []peer.ID {
-	return []peer.ID{}
-}
+func (rs *RandomSubRouter) SendRPC(peerID peer.ID, out *RPC)                   {}
+func (rs *RandomSubRouter) Flush()                                             {}
+func (rs *RandomSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {}
