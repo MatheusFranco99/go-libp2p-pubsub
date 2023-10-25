@@ -188,3 +188,4 @@ func (rs *RandomSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, 
 func (rs *RandomSubRouter) SendRPC(peerID peer.ID, out *RPC)                   {}
 func (rs *RandomSubRouter) Flush()                                             {}
 func (rs *RandomSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {}
+func (rs *RandomSubRouter) GetRouterMetrics() *RouterMetrics                   { return nil }

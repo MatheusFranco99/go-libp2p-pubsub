@@ -226,6 +226,9 @@ type PubSubRouter interface {
 	SendRPC(peerID peer.ID, out *RPC)
 	Flush()
 	WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)
+
+	// Export metrics
+	GetRouterMetrics() *RouterMetrics
 }
 
 type AcceptStatus int
@@ -1105,6 +1108,11 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 		p.tracer.ThrottlePeer(rpc.from)
 
 	case AcceptAll:
+
+		// Router Metrics - Full Message
+		routerMetrics := p.rt.GetRouterMetrics()
+		routerMetrics.FullMessages += 1
+
 		for _, pmsg := range rpc.GetPublish() {
 			if !(p.subscribedToMsg(pmsg) || p.canRelayMsg(pmsg)) {
 				log.Debug("received message in topic we didn't subscribe to; ignoring message")

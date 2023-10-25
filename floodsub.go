@@ -128,3 +128,4 @@ func (fs *FloodSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, b
 func (fs *FloodSubRouter) SendRPC(peerID peer.ID, out *RPC)                   {}
 func (fs *FloodSubRouter) Flush()                                             {}
 func (fs *FloodSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {}
+func (fs *FloodSubRouter) GetRouterMetrics() *RouterMetrics                   { return nil }

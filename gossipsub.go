@@ -206,6 +206,16 @@ type GossipSubParams struct {
 	IWantFollowupTime time.Duration
 }
 
+type RouterMetrics struct {
+	FullMessages    uint64
+	ControlMessages uint64
+
+	IHAVE uint64
+	IWANT uint64
+	GRAFT uint64
+	PRUNE uint64
+}
+
 // NewGossipSub returns a new PubSub object using the default GossipSubRouter as the router.
 func NewGossipSub(ctx context.Context, h host.Host, opts ...Option) (*PubSub, error) {
 	rt := DefaultGossipSubRouter(h)
@@ -222,22 +232,23 @@ func NewGossipSubWithRouter(ctx context.Context, h host.Host, rt PubSubRouter, o
 func DefaultGossipSubRouter(h host.Host) *GossipSubRouter {
 	params := DefaultGossipSubParams()
 	return &GossipSubRouter{
-		peers:     make(map[peer.ID]protocol.ID),
-		mesh:      make(map[string]map[peer.ID]struct{}),
-		fanout:    make(map[string]map[peer.ID]struct{}),
-		lastpub:   make(map[string]int64),
-		gossip:    make(map[peer.ID][]*pb.ControlIHave),
-		control:   make(map[peer.ID]*pb.ControlMessage),
-		backoff:   make(map[string]map[peer.ID]time.Time),
-		peerhave:  make(map[peer.ID]int),
-		iasked:    make(map[peer.ID]int),
-		outbound:  make(map[peer.ID]bool),
-		connect:   make(chan connectInfo, params.MaxPendingConnections),
-		mcache:    NewMessageCache(params.HistoryGossip, params.HistoryLength),
-		protos:    GossipSubDefaultProtocols,
-		feature:   GossipSubDefaultFeatures,
-		tagTracer: newTagTracer(h.ConnManager()),
-		params:    params,
+		peers:         make(map[peer.ID]protocol.ID),
+		mesh:          make(map[string]map[peer.ID]struct{}),
+		fanout:        make(map[string]map[peer.ID]struct{}),
+		lastpub:       make(map[string]int64),
+		gossip:        make(map[peer.ID][]*pb.ControlIHave),
+		control:       make(map[peer.ID]*pb.ControlMessage),
+		backoff:       make(map[string]map[peer.ID]time.Time),
+		peerhave:      make(map[peer.ID]int),
+		iasked:        make(map[peer.ID]int),
+		outbound:      make(map[peer.ID]bool),
+		connect:       make(chan connectInfo, params.MaxPendingConnections),
+		mcache:        NewMessageCache(params.HistoryGossip, params.HistoryLength),
+		protos:        GossipSubDefaultProtocols,
+		feature:       GossipSubDefaultFeatures,
+		tagTracer:     newTagTracer(h.ConnManager()),
+		params:        params,
+		RouterMetrics: &RouterMetrics{},
 	}
 }
 
@@ -479,6 +490,9 @@ type GossipSubRouter struct {
 
 	// Proxy function for heartbeat
 	heartbeatProxy HeartbeatProxyFn
+
+	// Metrics State
+	RouterMetrics *RouterMetrics
 }
 
 type connectInfo struct {
@@ -619,6 +633,9 @@ func (gs *GossipSubRouter) HandleRPC(rpc *RPC) {
 		return
 	}
 
+	// Metrics - Control message
+	gs.RouterMetrics.ControlMessages += 1
+
 	iwant := gs.handleIHave(rpc.from, ctl)
 	ihave := gs.handleIWant(rpc.from, ctl)
 	prune := gs.handleGraft(rpc.from, ctl)
@@ -633,6 +650,10 @@ func (gs *GossipSubRouter) HandleRPC(rpc *RPC) {
 }
 
 func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.ControlIWant {
+
+	// Metrics - IHAVE
+	gs.RouterMetrics.IHAVE += 1
+
 	// we ignore IHAVE gossip from any peer whose score is below the gossip threshold
 	score := gs.score.Score(p)
 	if score < gs.gossipThreshold {
@@ -701,6 +722,10 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 }
 
 func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.Message {
+
+	// Metrics - IWANT
+	gs.RouterMetrics.IWANT += 1
+
 	// we don't respond to IWANT requests from any peer whose score is below the gossip threshold
 	score := gs.score.Score(p)
 	if score < gs.gossipThreshold {
@@ -744,6 +769,10 @@ func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.
 }
 
 func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.ControlPrune {
+
+	// Metrics - GRAFT
+	gs.RouterMetrics.GRAFT += 1
+
 	var prune []string
 
 	doPX := gs.doPX
@@ -842,6 +871,10 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 }
 
 func (gs *GossipSubRouter) handlePrune(p peer.ID, ctl *pb.ControlMessage) {
+
+	// Metrics - PRUNE
+	gs.RouterMetrics.PRUNE += 1
+
 	score := gs.score.Score(p)
 
 	for _, prune := range ctl.GetPrune() {
@@ -2042,4 +2075,9 @@ func (gs *GossipSubRouter) Flush() {
 // Set heartbeat proxy
 func (gs *GossipSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
 	gs.heartbeatProxy = heartbeatProxy
+}
+
+// Export router metrics
+func (gs *GossipSubRouter) GetRouterMetrics() *RouterMetrics {
+	return gs.RouterMetrics
 }
