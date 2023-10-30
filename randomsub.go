@@ -186,8 +186,9 @@ func (rs *RandomSubRouter) CreatePRUNE(topic string) *pb.ControlPrune        { r
 func (rs *RandomSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, backoff uint64) *pb.ControlPrune {
 	return nil
 }
-func (rs *RandomSubRouter) SendRPC(peerID peer.ID, out *RPC)                   {}
-func (rs *RandomSubRouter) Flush()                                             {}
-func (rs *RandomSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {}
-func (rs *RandomSubRouter) GetGossipSubParams() *GossipSubParams               { return nil }
-func (rs *RandomSubRouter) GetRouterMetrics() *RouterMetrics                   { return nil }
+func (rs *RandomSubRouter) SendRPC(peerID peer.ID, out *RPC)                            {}
+func (rs *RandomSubRouter) Flush()                                                      {}
+func (rs *RandomSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)          {}
+func (rs *RandomSubRouter) GetGossipSubParams() *GossipSubParams                        { return nil }
+func (rs *RandomSubRouter) GetRouterMetrics() *RouterMetrics                            { return nil }
+func (rs *RandomSubRouter) PublishToPeers(data []byte, topic string, peerIDs []peer.ID) {}

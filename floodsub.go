@@ -126,8 +126,9 @@ func (fs *FloodSubRouter) CreatePRUNE(topic string) *pb.ControlPrune        { re
 func (fs *FloodSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, backoff uint64) *pb.ControlPrune {
 	return nil
 }
-func (fs *FloodSubRouter) SendRPC(peerID peer.ID, out *RPC)                   {}
-func (fs *FloodSubRouter) Flush()                                             {}
-func (fs *FloodSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {}
-func (fs *FloodSubRouter) GetGossipSubParams() *GossipSubParams               { return nil }
-func (fs *FloodSubRouter) GetRouterMetrics() *RouterMetrics                   { return nil }
+func (fs *FloodSubRouter) SendRPC(peerID peer.ID, out *RPC)                            {}
+func (fs *FloodSubRouter) Flush()                                                      {}
+func (fs *FloodSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)          {}
+func (fs *FloodSubRouter) GetGossipSubParams() *GossipSubParams                        { return nil }
+func (fs *FloodSubRouter) GetRouterMetrics() *RouterMetrics                            { return nil }
+func (fs *FloodSubRouter) PublishToPeers(data []byte, topic string, peerIDs []peer.ID) {}

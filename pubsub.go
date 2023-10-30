@@ -228,6 +228,7 @@ type PubSubRouter interface {
 	Flush()
 	WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)
 	GetGossipSubParams() *GossipSubParams
+	PublishToPeers(data []byte, topic string, peerIDs []peer.ID)
 
 	// Export metrics
 	GetRouterMetrics() *RouterMetrics

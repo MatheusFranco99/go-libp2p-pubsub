@@ -2091,3 +2091,21 @@ func (gs *GossipSubRouter) GetRouterMetrics() *RouterMetrics {
 func (gs *GossipSubRouter) GetGossipSubParams() *GossipSubParams {
 	return &gs.params
 }
+
+// PublishToPeers allows sending a message directly to a list of peers
+func (gs *GossipSubRouter) PublishToPeers(data []byte, topic string, peerIDs []peer.ID) {
+
+	// Creates the pubsub message
+	pubsubMessage := &pb.Message{
+		Data:  data,
+		Topic: &topic,
+		From:  nil, // nil due to the StrictNoSign flag
+		Seqno: nil, // nil due to the StrictNoSign flag
+	}
+	out := rpcWithMessages(pubsubMessage)
+
+	// Send to the peers
+	for _, peerID := range peerIDs {
+		gs.sendRPC(peerID, out)
+	}
+}
