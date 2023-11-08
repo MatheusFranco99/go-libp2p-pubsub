@@ -207,13 +207,35 @@ type GossipSubParams struct {
 }
 
 type RouterMetrics struct {
-	FullMessages    uint64
+	// FullMessages - total number of messages received by current peer
+	FullMessages uint64
+	// ControlMessages - total number of ctrl messages received
 	ControlMessages uint64
+
+	SentPublishMessages uint64
+	SentControlMessages uint64
+	SentMessagesTotal   uint64
+
+	HandledControlMessagesByPid map[peer.ID]uint64
+	SentControlMessagesToPeer   map[peer.ID]uint64
 
 	IHAVE uint64
 	IWANT uint64
 	GRAFT uint64
 	PRUNE uint64
+}
+
+func (m *RouterMetrics) SentControlMessagesByPidInc(pid peer.ID) {
+	m.SentControlMessagesToPeer[pid]++
+}
+func (m *RouterMetrics) SentControlMessagesByPidRemove(pid peer.ID) {
+	delete(m.SentControlMessagesToPeer, pid)
+}
+func (m *RouterMetrics) HandledControlMessagesByPidInc(pid peer.ID) {
+	m.HandledControlMessagesByPid[pid]++
+}
+func (m *RouterMetrics) HandledControlMessagesByPidRemove(pid peer.ID) {
+	delete(m.HandledControlMessagesByPid, pid)
 }
 
 // NewGossipSub returns a new PubSub object using the default GossipSubRouter as the router.
@@ -231,6 +253,11 @@ func NewGossipSubWithRouter(ctx context.Context, h host.Host, rt PubSubRouter, o
 // DefaultGossipSubRouter returns a new GossipSubRouter with default parameters.
 func DefaultGossipSubRouter(h host.Host) *GossipSubRouter {
 	params := DefaultGossipSubParams()
+
+	metrics := &RouterMetrics{}
+	metrics.HandledControlMessagesByPid = make(map[peer.ID]uint64)
+	metrics.SentControlMessagesToPeer = make(map[peer.ID]uint64)
+
 	return &GossipSubRouter{
 		peers:         make(map[peer.ID]protocol.ID),
 		mesh:          make(map[string]map[peer.ID]struct{}),
@@ -248,7 +275,7 @@ func DefaultGossipSubRouter(h host.Host) *GossipSubRouter {
 		feature:       GossipSubDefaultFeatures,
 		tagTracer:     newTagTracer(h.ConnManager()),
 		params:        params,
-		RouterMetrics: &RouterMetrics{},
+		RouterMetrics: metrics,
 	}
 }
 
@@ -583,6 +610,7 @@ func (gs *GossipSubRouter) RemovePeer(p peer.ID) {
 	delete(gs.gossip, p)
 	delete(gs.control, p)
 	delete(gs.outbound, p)
+	gs.RouterMetrics.HandledControlMessagesByPidRemove(p)
 }
 
 func (gs *GossipSubRouter) EnoughPeers(topic string, suggested int) bool {
@@ -635,6 +663,7 @@ func (gs *GossipSubRouter) HandleRPC(rpc *RPC) {
 
 	// Metrics - Control message
 	gs.RouterMetrics.ControlMessages += 1
+	gs.RouterMetrics.HandledControlMessagesByPidInc(rpc.from)
 
 	iwant := gs.handleIHave(rpc.from, ctl)
 	ihave := gs.handleIWant(rpc.from, ctl)
@@ -1231,6 +1260,15 @@ func (gs *GossipSubRouter) doDropRPC(rpc *RPC, p peer.ID, reason string) {
 }
 
 func (gs *GossipSubRouter) doSendRPC(rpc *RPC, p peer.ID, mch chan *RPC) {
+	if rpc.GetControl() != nil {
+		gs.GetRouterMetrics().SentControlMessagesByPidInc(p)
+		gs.GetRouterMetrics().SentControlMessages++
+	}
+	if rpc.GetPublish() != nil {
+		gs.GetRouterMetrics().SentPublishMessages++
+	}
+	gs.GetRouterMetrics().SentMessagesTotal++
+
 	select {
 	case mch <- rpc:
 		gs.tracer.SendRPC(rpc, p)
