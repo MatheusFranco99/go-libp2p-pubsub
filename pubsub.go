@@ -1450,3 +1450,7 @@ type addRelayReq struct {
 func (p *PubSub) GetRouter() PubSubRouter {
 	return p.rt
 }
+
+func (p *PubSub) GetHost() host.Host {
+	return p.host
+}
