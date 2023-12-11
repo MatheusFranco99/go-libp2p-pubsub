@@ -192,3 +192,4 @@ func (rs *RandomSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)  
 func (rs *RandomSubRouter) GetGossipSubParams() *GossipSubParams                        { return nil }
 func (rs *RandomSubRouter) GetRouterMetrics() *RouterMetrics                            { return nil }
 func (rs *RandomSubRouter) PublishToPeers(data []byte, topic string, peerIDs []peer.ID) {}
+func (gs *RandomSubRouter) EnqueueGossip(p peer.ID, ihave *pb.ControlIHave)             {}

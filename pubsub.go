@@ -229,6 +229,7 @@ type PubSubRouter interface {
 	WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)
 	GetGossipSubParams() *GossipSubParams
 	PublishToPeers(data []byte, topic string, peerIDs []peer.ID)
+	EnqueueGossip(p peer.ID, ihave *pb.ControlIHave)
 
 	// Export metrics
 	GetRouterMetrics() *RouterMetrics

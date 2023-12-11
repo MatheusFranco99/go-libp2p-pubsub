@@ -132,3 +132,4 @@ func (fs *FloodSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)   
 func (fs *FloodSubRouter) GetGossipSubParams() *GossipSubParams                        { return nil }
 func (fs *FloodSubRouter) GetRouterMetrics() *RouterMetrics                            { return nil }
 func (fs *FloodSubRouter) PublishToPeers(data []byte, topic string, peerIDs []peer.ID) {}
+func (gs *FloodSubRouter) EnqueueGossip(p peer.ID, ihave *pb.ControlIHave)             {}

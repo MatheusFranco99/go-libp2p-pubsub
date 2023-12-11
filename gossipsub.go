@@ -2147,3 +2147,10 @@ func (gs *GossipSubRouter) PublishToPeers(data []byte, topic string, peerIDs []p
 		gs.sendRPC(peerID, out)
 	}
 }
+
+// Add gossip (IHAVE) to pending queue
+func (gs *GossipSubRouter) EnqueueGossip(p peer.ID, ihave *pb.ControlIHave) {
+	gossip := gs.gossip[p]
+	gossip = append(gossip, ihave)
+	gs.gossip[p] = gossip
+}
