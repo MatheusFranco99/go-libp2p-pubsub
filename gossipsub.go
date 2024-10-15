@@ -2303,7 +2303,7 @@ func (gs *GossipSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, 
 
 // Export SendRPC
 func (gs *GossipSubRouter) SendRPC(peerID peer.ID, out *RPC) {
-	gs.sendRPC(peerID, out)
+	gs.sendRPC(peerID, out, true)
 }
 
 // Export flush (sends pending gossips)
@@ -2340,7 +2340,7 @@ func (gs *GossipSubRouter) PublishToPeers(data []byte, topic string, peerIDs []p
 
 	// Send to the peers
 	for _, peerID := range peerIDs {
-		gs.sendRPC(peerID, out)
+		gs.sendRPC(peerID, out, true)
 	}
 }
 

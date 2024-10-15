@@ -238,5 +238,7 @@ func RPCWithControl(msgs []*pb.Message,
 	iwant []*pb.ControlIWant,
 	graft []*pb.ControlGraft,
 	prune []*pb.ControlPrune) *RPC {
-	return rpcWithControl(msgs, ihave, iwant, graft, prune)
+	return rpcWithControl(msgs, ihave, iwant, graft, prune,
+		[]*pb.ControlIDontWant{}, // Don't use IDonWant
+	)
 }
