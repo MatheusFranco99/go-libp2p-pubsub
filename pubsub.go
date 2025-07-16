@@ -215,6 +215,27 @@ type PubSubRouter interface {
 	// Leave notifies the router that we are no longer interested in a topic.
 	// It is invoked after the unsubscription announcement.
 	Leave(topic string)
+
+	// Functions to export GossipSub functionality for the simulator
+	GetTopics() map[string]map[peer.ID]struct{}
+	GetMessageIDsForTopic(topic string) []string
+	GetMesh() map[string]map[peer.ID]struct{}
+	GetBackoff() map[string]map[peer.ID]time.Time
+	CreateIHAVEInGossipSubWay(topic string, messageIDs []string) *pb.ControlIHave
+	CreateCustomIHAVE(topic string, messageIDs []string) *pb.ControlIHave
+	CreateIWANT(messageIDs []string) *pb.ControlIWant
+	CreateGRAFT(topic string) *pb.ControlGraft
+	CreatePRUNE(topic string) *pb.ControlPrune
+	CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, backoff uint64) *pb.ControlPrune
+	SendRPC(peerID peer.ID, out *RPC)
+	Flush()
+	WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)
+	GetGossipSubParams() *GossipSubParams
+	PublishToPeers(data []byte, topic string, peerIDs []peer.ID)
+	EnqueueGossip(p peer.ID, ihave *pb.ControlIHave)
+
+	// Export metrics
+	GetRouterMetrics() *RouterMetrics
 }
 
 type AcceptStatus int
@@ -1094,6 +1115,11 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 		p.tracer.ThrottlePeer(rpc.from)
 
 	case AcceptAll:
+
+		// Router Metrics - Full Message
+		routerMetrics := p.rt.GetRouterMetrics()
+		routerMetrics.FullMessages += 1
+
 		var toPush []*Message
 		for _, pmsg := range rpc.GetPublish() {
 			if !(p.subscribedToMsg(pmsg) || p.canRelayMsg(pmsg)) {
@@ -1439,4 +1465,13 @@ type RelayCancelFunc func()
 type addRelayReq struct {
 	topic string
 	resp  chan RelayCancelFunc
+}
+
+// Expose router
+func (p *PubSub) GetRouter() PubSubRouter {
+	return p.rt
+}
+
+func (p *PubSub) GetHost() host.Host {
+	return p.host
 }

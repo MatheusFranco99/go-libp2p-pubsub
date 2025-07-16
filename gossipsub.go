@@ -40,6 +40,8 @@ const (
 	GossipSubID_v12 = protocol.ID("/meshsub/1.2.0")
 )
 
+type HeartbeatProxyFn func()
+
 // Defines the default gossipsub parameters.
 var (
 	GossipSubD                                = 6
@@ -240,6 +242,38 @@ type GossipSubParams struct {
 	IDontWantMessageTTL int
 }
 
+type RouterMetrics struct {
+	// FullMessages - total number of messages received by current peer
+	FullMessages uint64
+	// ControlMessages - total number of ctrl messages received
+	ControlMessages uint64
+
+	SentPublishMessages uint64
+	SentControlMessages uint64
+	SentMessagesTotal   uint64
+
+	HandledControlMessagesByPid map[peer.ID]uint64
+	SentControlMessagesToPeer   map[peer.ID]uint64
+
+	IHAVE uint64
+	IWANT uint64
+	GRAFT uint64
+	PRUNE uint64
+}
+
+func (m *RouterMetrics) SentControlMessagesByPidInc(pid peer.ID) {
+	m.SentControlMessagesToPeer[pid]++
+}
+func (m *RouterMetrics) SentControlMessagesByPidRemove(pid peer.ID) {
+	delete(m.SentControlMessagesToPeer, pid)
+}
+func (m *RouterMetrics) HandledControlMessagesByPidInc(pid peer.ID) {
+	m.HandledControlMessagesByPid[pid]++
+}
+func (m *RouterMetrics) HandledControlMessagesByPidRemove(pid peer.ID) {
+	delete(m.HandledControlMessagesByPid, pid)
+}
+
 // NewGossipSub returns a new PubSub object using the default GossipSubRouter as the router.
 func NewGossipSub(ctx context.Context, h host.Host, opts ...Option) (*PubSub, error) {
 	rt := DefaultGossipSubRouter(h)
@@ -255,26 +289,32 @@ func NewGossipSubWithRouter(ctx context.Context, h host.Host, rt PubSubRouter, o
 // DefaultGossipSubRouter returns a new GossipSubRouter with default parameters.
 func DefaultGossipSubRouter(h host.Host) *GossipSubRouter {
 	params := DefaultGossipSubParams()
+
+	metrics := &RouterMetrics{}
+	metrics.HandledControlMessagesByPid = make(map[peer.ID]uint64)
+	metrics.SentControlMessagesToPeer = make(map[peer.ID]uint64)
+
 	return &GossipSubRouter{
-		peers:        make(map[peer.ID]protocol.ID),
-		mesh:         make(map[string]map[peer.ID]struct{}),
-		fanout:       make(map[string]map[peer.ID]struct{}),
-		lastpub:      make(map[string]int64),
-		gossip:       make(map[peer.ID][]*pb.ControlIHave),
-		control:      make(map[peer.ID]*pb.ControlMessage),
-		backoff:      make(map[string]map[peer.ID]time.Time),
-		peerhave:     make(map[peer.ID]int),
-		peerdontwant: make(map[peer.ID]int),
-		unwanted:     make(map[peer.ID]map[checksum]int),
-		iasked:       make(map[peer.ID]int),
-		outbound:     make(map[peer.ID]bool),
-		connect:      make(chan connectInfo, params.MaxPendingConnections),
-		cab:          pstoremem.NewAddrBook(),
-		mcache:       NewMessageCache(params.HistoryGossip, params.HistoryLength),
-		protos:       GossipSubDefaultProtocols,
-		feature:      GossipSubDefaultFeatures,
-		tagTracer:    newTagTracer(h.ConnManager()),
-		params:       params,
+		peers:         make(map[peer.ID]protocol.ID),
+		mesh:          make(map[string]map[peer.ID]struct{}),
+		fanout:        make(map[string]map[peer.ID]struct{}),
+		lastpub:       make(map[string]int64),
+		gossip:        make(map[peer.ID][]*pb.ControlIHave),
+		control:       make(map[peer.ID]*pb.ControlMessage),
+		backoff:       make(map[string]map[peer.ID]time.Time),
+		peerhave:      make(map[peer.ID]int),
+		peerdontwant:  make(map[peer.ID]int),
+		unwanted:      make(map[peer.ID]map[checksum]int),
+		iasked:        make(map[peer.ID]int),
+		outbound:      make(map[peer.ID]bool),
+		connect:       make(chan connectInfo, params.MaxPendingConnections),
+		cab:           pstoremem.NewAddrBook(),
+		mcache:        NewMessageCache(params.HistoryGossip, params.HistoryLength),
+		protos:        GossipSubDefaultProtocols,
+		feature:       GossipSubDefaultFeatures,
+		tagTracer:     newTagTracer(h.ConnManager()),
+		params:        params,
+		RouterMetrics: metrics,
 	}
 }
 
@@ -520,6 +560,12 @@ type GossipSubRouter struct {
 	// number of heartbeats since the beginning of time; this allows us to amortize some resource
 	// clean up -- eg backoff clean up.
 	heartbeatTicks uint64
+
+	// Proxy function for heartbeat
+	heartbeatProxy HeartbeatProxyFn
+
+	// Metrics State
+	RouterMetrics *RouterMetrics
 }
 
 type connectInfo struct {
@@ -660,6 +706,7 @@ func (gs *GossipSubRouter) RemovePeer(p peer.ID) {
 	delete(gs.gossip, p)
 	delete(gs.control, p)
 	delete(gs.outbound, p)
+	gs.RouterMetrics.HandledControlMessagesByPidRemove(p)
 }
 
 func (gs *GossipSubRouter) EnoughPeers(topic string, suggested int) bool {
@@ -740,6 +787,10 @@ func (gs *GossipSubRouter) HandleRPC(rpc *RPC) {
 		return
 	}
 
+	// Metrics - Control message
+	gs.RouterMetrics.ControlMessages += 1
+	gs.RouterMetrics.HandledControlMessagesByPidInc(rpc.from)
+
 	iwant := gs.handleIHave(rpc.from, ctl)
 	ihave := gs.handleIWant(rpc.from, ctl)
 	prune := gs.handleGraft(rpc.from, ctl)
@@ -755,6 +806,10 @@ func (gs *GossipSubRouter) HandleRPC(rpc *RPC) {
 }
 
 func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.ControlIWant {
+
+	// Metrics - IHAVE
+	gs.RouterMetrics.IHAVE += 1
+
 	// we ignore IHAVE gossip from any peer whose score is below the gossip threshold
 	score := gs.score.Score(p)
 	if score < gs.gossipThreshold {
@@ -829,6 +884,10 @@ func (gs *GossipSubRouter) handleIHave(p peer.ID, ctl *pb.ControlMessage) []*pb.
 }
 
 func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.Message {
+
+	// Metrics - IWANT
+	gs.RouterMetrics.IWANT += 1
+
 	// we don't respond to IWANT requests from any peer whose score is below the gossip threshold
 	score := gs.score.Score(p)
 	if score < gs.gossipThreshold {
@@ -877,6 +936,10 @@ func (gs *GossipSubRouter) handleIWant(p peer.ID, ctl *pb.ControlMessage) []*pb.
 }
 
 func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.ControlPrune {
+
+	// Metrics - GRAFT
+	gs.RouterMetrics.GRAFT += 1
+
 	var prune []string
 
 	doPX := gs.doPX
@@ -975,6 +1038,10 @@ func (gs *GossipSubRouter) handleGraft(p peer.ID, ctl *pb.ControlMessage) []*pb.
 }
 
 func (gs *GossipSubRouter) handlePrune(p peer.ID, ctl *pb.ControlMessage) {
+
+	// Metrics - PRUNE
+	gs.RouterMetrics.PRUNE += 1
+
 	score := gs.score.Score(p)
 
 	for _, prune := range ctl.GetPrune() {
@@ -1368,6 +1435,15 @@ func (gs *GossipSubRouter) doDropRPC(rpc *RPC, p peer.ID, reason string) {
 }
 
 func (gs *GossipSubRouter) doSendRPC(rpc *RPC, p peer.ID, q *rpcQueue, urgent bool) {
+	if rpc.GetControl() != nil {
+		gs.GetRouterMetrics().SentControlMessagesByPidInc(p)
+		gs.GetRouterMetrics().SentControlMessages++
+	}
+	if rpc.GetPublish() != nil {
+		gs.GetRouterMetrics().SentPublishMessages++
+	}
+	gs.GetRouterMetrics().SentMessagesTotal++
+
 	var err error
 	if urgent {
 		err = q.UrgentPush(rpc, false)
@@ -1547,6 +1623,10 @@ func (gs *GossipSubRouter) heartbeat() {
 			}
 		}
 	}()
+
+	if gs.heartbeatProxy != nil {
+		gs.heartbeatProxy()
+	}
 
 	gs.heartbeatTicks++
 
@@ -2193,6 +2273,119 @@ func shuffleStrings(lst []string) {
 		j := rand.Intn(i + 1)
 		lst[i], lst[j] = lst[j], lst[i]
 	}
+}
+
+// Export the topics map
+func (gs *GossipSubRouter) GetTopics() map[string]map[peer.ID]struct{} {
+	return gs.p.topics
+}
+
+// Export message IDs in mcache for a given topic
+func (gs *GossipSubRouter) GetMessageIDsForTopic(topic string) []string {
+	return gs.mcache.GetGossipIDs(topic)
+}
+
+// Export mesh map
+func (gs *GossipSubRouter) GetMesh() map[string]map[peer.ID]struct{} {
+	return gs.mesh
+}
+
+// Export the backoff map
+func (gs *GossipSubRouter) GetBackoff() map[string]map[peer.ID]time.Time {
+	return gs.backoff
+}
+
+// Creates an IHAVE message for a given topic and message IDs list.
+// Before doing it, it shuffles the messageIDs and truncate to the maximum length allowed
+func (gs *GossipSubRouter) CreateIHAVEInGossipSubWay(topic string, messageIDs []string) *pb.ControlIHave {
+
+	// Shuffle to emit in random order
+	shuffleStrings(messageIDs)
+
+	// Truncate IHAVE length if it's superior to  maximum
+	restrictedMessageIDs := messageIDs
+	if len(messageIDs) > gs.params.MaxIHaveLength {
+		restrictedMessageIDs = make([]string, gs.params.MaxIHaveLength)
+		copy(restrictedMessageIDs, messageIDs)
+	}
+
+	controlIHAVE := pb.ControlIHave{TopicID: &topic, MessageIDs: restrictedMessageIDs}
+
+	return &controlIHAVE
+}
+
+// Creates an IHAVE message for a given topic and message ID list.
+func (gs *GossipSubRouter) CreateCustomIHAVE(topic string, messageIDs []string) *pb.ControlIHave {
+	return &pb.ControlIHave{TopicID: &topic, MessageIDs: messageIDs}
+}
+
+func (gs *GossipSubRouter) CreateIWANT(messageIDs []string) *pb.ControlIWant {
+	return &pb.ControlIWant{MessageIDs: messageIDs}
+}
+
+// Create a GRAFT message for a topic
+func (gs *GossipSubRouter) CreateGRAFT(topic string) *pb.ControlGraft {
+	return &pb.ControlGraft{TopicID: &topic}
+}
+
+// Create a standard PRUNE message for a topic
+func (gs *GossipSubRouter) CreatePRUNE(topic string) *pb.ControlPrune {
+	return &pb.ControlPrune{TopicID: &topic}
+}
+
+// Create a PRUNE message with detailed fields such as peer suggestion and backoff time
+func (gs *GossipSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, backoff uint64) *pb.ControlPrune {
+	return &pb.ControlPrune{TopicID: &topic, Peers: px, Backoff: &backoff}
+}
+
+// Export SendRPC
+func (gs *GossipSubRouter) SendRPC(peerID peer.ID, out *RPC) {
+	gs.sendRPC(peerID, out, true)
+}
+
+// Export flush (sends pending gossips)
+func (gs *GossipSubRouter) Flush() {
+	gs.flush()
+}
+
+// Set heartbeat proxy
+func (gs *GossipSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
+	gs.heartbeatProxy = heartbeatProxy
+}
+
+// Export router metrics
+func (gs *GossipSubRouter) GetRouterMetrics() *RouterMetrics {
+	return gs.RouterMetrics
+}
+
+// Export router metrics
+func (gs *GossipSubRouter) GetGossipSubParams() *GossipSubParams {
+	return &gs.params
+}
+
+// PublishToPeers allows sending a message directly to a list of peers
+func (gs *GossipSubRouter) PublishToPeers(data []byte, topic string, peerIDs []peer.ID) {
+
+	// Creates the pubsub message
+	pubsubMessage := &pb.Message{
+		Data:  data,
+		Topic: &topic,
+		From:  nil, // nil due to the StrictNoSign flag
+		Seqno: nil, // nil due to the StrictNoSign flag
+	}
+	out := rpcWithMessages(pubsubMessage)
+
+	// Send to the peers
+	for _, peerID := range peerIDs {
+		gs.sendRPC(peerID, out, true)
+	}
+}
+
+// Add gossip (IHAVE) to pending queue
+func (gs *GossipSubRouter) EnqueueGossip(p peer.ID, ihave *pb.ControlIHave) {
+	gossip := gs.gossip[p]
+	gossip = append(gossip, ihave)
+	gs.gossip[p] = gossip
 }
 
 func computeChecksum(mid string) checksum {

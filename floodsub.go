@@ -2,7 +2,9 @@ package pubsub
 
 import (
 	"context"
+	"time"
 
+	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -108,3 +110,28 @@ func (fs *FloodSubRouter) Join(topic string) {
 func (fs *FloodSubRouter) Leave(topic string) {
 	fs.tracer.Leave(topic)
 }
+
+// Mock methods due to the GossipSub exported functions for the simulator
+func (fs *FloodSubRouter) GetTopics() map[string]map[peer.ID]struct{}   { return nil }
+func (fs *FloodSubRouter) GetMessageIDsForTopic(topic string) []string  { return nil }
+func (fs *FloodSubRouter) GetMesh() map[string]map[peer.ID]struct{}     { return nil }
+func (fs *FloodSubRouter) GetBackoff() map[string]map[peer.ID]time.Time { return nil }
+func (fs *FloodSubRouter) CreateIHAVEInGossipSubWay(topic string, messageIDs []string) *pb.ControlIHave {
+	return nil
+}
+func (fs *FloodSubRouter) CreateCustomIHAVE(topic string, messageIDs []string) *pb.ControlIHave {
+	return nil
+}
+func (fs *FloodSubRouter) CreateIWANT(messageIDs []string) *pb.ControlIWant { return nil }
+func (fs *FloodSubRouter) CreateGRAFT(topic string) *pb.ControlGraft        { return nil }
+func (fs *FloodSubRouter) CreatePRUNE(topic string) *pb.ControlPrune        { return nil }
+func (fs *FloodSubRouter) CreateDetailedPRUNE(topic string, px []*pb.PeerInfo, backoff uint64) *pb.ControlPrune {
+	return nil
+}
+func (fs *FloodSubRouter) SendRPC(peerID peer.ID, out *RPC)                            {}
+func (fs *FloodSubRouter) Flush()                                                      {}
+func (fs *FloodSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn)          {}
+func (fs *FloodSubRouter) GetGossipSubParams() *GossipSubParams                        { return nil }
+func (fs *FloodSubRouter) GetRouterMetrics() *RouterMetrics                            { return nil }
+func (fs *FloodSubRouter) PublishToPeers(data []byte, topic string, peerIDs []peer.ID) {}
+func (gs *FloodSubRouter) EnqueueGossip(p peer.ID, ihave *pb.ControlIHave)             {}
