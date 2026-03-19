@@ -7,6 +7,7 @@ import (
 	"io"
 	"math/rand"
 	"sort"
+	"sync"
 	"time"
 
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
@@ -247,6 +248,14 @@ type RouterMetrics struct {
 	SentControlMessages uint64
 	SentMessagesTotal   uint64
 
+	// mu guards HandledControlMessagesByPid and SentControlMessagesToPeer maps.
+	// These maps are mutated by the internal processLoop goroutine (via HandleRPC,
+	// RemovePeer) and by external callers invoking the exported SendRPC (via doSendRPC)
+	// from separate goroutines. GetRouterMetrics() also reads and deep-copies the maps
+	// from another goroutine. Go maps are not safe for concurrent access and will cause
+	// a fatal panic, so the mutex is acquired for writes in the mutation methods and
+	// for reads in GetRouterMetrics().
+	mu                          sync.RWMutex
 	HandledControlMessagesByPid map[peer.ID]uint64
 	SentControlMessagesToPeer   map[peer.ID]uint64
 
@@ -257,16 +266,28 @@ type RouterMetrics struct {
 }
 
 func (m *RouterMetrics) SentControlMessagesByPidInc(pid peer.ID) {
+	m.mu.Lock()
 	m.SentControlMessagesToPeer[pid]++
+	m.mu.Unlock()
 }
 func (m *RouterMetrics) SentControlMessagesByPidRemove(pid peer.ID) {
+	m.mu.Lock()
 	delete(m.SentControlMessagesToPeer, pid)
+	m.mu.Unlock()
 }
 func (m *RouterMetrics) HandledControlMessagesByPidInc(pid peer.ID) {
+	m.mu.Lock()
 	m.HandledControlMessagesByPid[pid]++
+	m.mu.Unlock()
 }
 func (m *RouterMetrics) HandledControlMessagesByPidRemove(pid peer.ID) {
+	m.mu.Lock()
 	delete(m.HandledControlMessagesByPid, pid)
+	m.mu.Unlock()
+}
+
+func (m *RouterMetrics) FullMessagesInc() {
+	m.FullMessages++
 }
 
 // NewGossipSub returns a new PubSub object using the default GossipSubRouter as the router.
@@ -1416,13 +1437,13 @@ func (gs *GossipSubRouter) doDropRPC(rpc *RPC, p peer.ID, reason string) {
 
 func (gs *GossipSubRouter) doSendRPC(rpc *RPC, p peer.ID, q *rpcQueue, urgent bool) {
 	if rpc.GetControl() != nil {
-		gs.GetRouterMetrics().SentControlMessagesByPidInc(p)
-		gs.GetRouterMetrics().SentControlMessages++
+		gs.RouterMetrics.SentControlMessagesByPidInc(p)
+		gs.RouterMetrics.SentControlMessages++
 	}
 	if rpc.GetPublish() != nil {
-		gs.GetRouterMetrics().SentPublishMessages++
+		gs.RouterMetrics.SentPublishMessages++
 	}
-	gs.GetRouterMetrics().SentMessagesTotal++
+	gs.RouterMetrics.SentMessagesTotal++
 
 	var err error
 	if urgent {
@@ -2316,9 +2337,35 @@ func (gs *GossipSubRouter) WithHeartbeatProxy(heartbeatProxy HeartbeatProxyFn) {
 	gs.heartbeatProxy = heartbeatProxy
 }
 
-// Export router metrics
+// Export router metrics. Returns a deep copy safe for concurrent use.
 func (gs *GossipSubRouter) GetRouterMetrics() *RouterMetrics {
-	return gs.RouterMetrics
+	gs.RouterMetrics.mu.RLock()
+	defer gs.RouterMetrics.mu.RUnlock()
+
+	snapshot := &RouterMetrics{
+		FullMessages:        gs.RouterMetrics.FullMessages,
+		ControlMessages:     gs.RouterMetrics.ControlMessages,
+		SentPublishMessages: gs.RouterMetrics.SentPublishMessages,
+		SentControlMessages: gs.RouterMetrics.SentControlMessages,
+		SentMessagesTotal:   gs.RouterMetrics.SentMessagesTotal,
+		IHAVE:               gs.RouterMetrics.IHAVE,
+		IWANT:               gs.RouterMetrics.IWANT,
+		GRAFT:               gs.RouterMetrics.GRAFT,
+		PRUNE:               gs.RouterMetrics.PRUNE,
+	}
+	snapshot.SentControlMessagesToPeer = make(map[peer.ID]uint64, len(gs.RouterMetrics.SentControlMessagesToPeer))
+	for k, v := range gs.RouterMetrics.SentControlMessagesToPeer {
+		snapshot.SentControlMessagesToPeer[k] = v
+	}
+	snapshot.HandledControlMessagesByPid = make(map[peer.ID]uint64, len(gs.RouterMetrics.HandledControlMessagesByPid))
+	for k, v := range gs.RouterMetrics.HandledControlMessagesByPid {
+		snapshot.HandledControlMessagesByPid[k] = v
+	}
+	return snapshot
+}
+
+func (gs *GossipSubRouter) FullMessagesInc() {
+	gs.RouterMetrics.FullMessagesInc()
 }
 
 // Export router metrics

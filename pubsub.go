@@ -236,6 +236,7 @@ type PubSubRouter interface {
 
 	// Export metrics
 	GetRouterMetrics() *RouterMetrics
+	FullMessagesInc()
 }
 
 type AcceptStatus int
@@ -1117,8 +1118,7 @@ func (p *PubSub) handleIncomingRPC(rpc *RPC) {
 	case AcceptAll:
 
 		// Router Metrics - Full Message
-		routerMetrics := p.rt.GetRouterMetrics()
-		routerMetrics.FullMessages += 1
+		p.rt.FullMessagesInc()
 
 		var toPush []*Message
 		for _, pmsg := range rpc.GetPublish() {
